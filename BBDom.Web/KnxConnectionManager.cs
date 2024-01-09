@@ -92,65 +92,65 @@ namespace BBDom.Web
                 calendar.Events.Add(e_6_30__8);
                 myCalendarEvents.Add(e_6_30__8);
                 //off
-                var e_8__12 = new MyCalendarEvent
+                var e_8__15 = new MyCalendarEvent
                 {
                     Start = new CalDateTime(new DateTime(2021, 1, 4, 8, 0, 0)),
-                    End = new CalDateTime(new DateTime(2021, 1, 4, 12, 0, 0)),
+                    End = new CalDateTime(new DateTime(2021, 1, 4, 15, 0, 0)),
                     RecurrenceRules = new List<RecurrencePattern> { rrule },
                     Offset = offsetOff,
                 };
-                calendar.Events.Add(e_8__12);
-                myCalendarEvents.Add(e_8__12);
+                calendar.Events.Add(e_8__15);
+                myCalendarEvents.Add(e_8__15);
                 //on
-                var e_12__14 = new MyCalendarEvent
+                //var e_12__14 = new MyCalendarEvent
+                //{
+                //    Start = new CalDateTime(new DateTime(2021, 1, 4, 12, 0, 0)),
+                //    End = new CalDateTime(new DateTime(2021, 1, 4, 14, 0, 0)),
+                //    RecurrenceRules = new List<RecurrencePattern> { rrule },
+                //    Offset = offsetOn,
+                //};
+                //calendar.Events.Add(e_12__14);
+                //myCalendarEvents.Add(e_12__14);
+                ////off
+                //var e_14__17 = new MyCalendarEvent
+                //{
+                //    Start = new CalDateTime(new DateTime(2021, 1, 4, 14, 0, 0)),
+                //    End = new CalDateTime(new DateTime(2021, 1, 4, 17, 0, 0)),
+                //    RecurrenceRules = new List<RecurrencePattern> { rrule },
+                //    Offset = offsetOff,
+                //};
+                //calendar.Events.Add(e_14__17);
+                //myCalendarEvents.Add(e_14__17);
+                //on
+                var e_15__17_30 = new MyCalendarEvent
                 {
-                    Start = new CalDateTime(new DateTime(2021, 1, 4, 12, 0, 0)),
-                    End = new CalDateTime(new DateTime(2021, 1, 4, 14, 0, 0)),
+                    Start = new CalDateTime(new DateTime(2021, 1, 4, 15, 0, 0)),
+                    End = new CalDateTime(new DateTime(2021, 1, 4, 17, 30, 0)),
                     RecurrenceRules = new List<RecurrencePattern> { rrule },
                     Offset = offsetOn,
                 };
-                calendar.Events.Add(e_12__14);
-                myCalendarEvents.Add(e_12__14);
+                calendar.Events.Add(e_15__17_30);
+                myCalendarEvents.Add(e_15__17_30);
                 //off
-                var e_14__17 = new MyCalendarEvent
+                var e_17_30__20_00 = new MyCalendarEvent
                 {
-                    Start = new CalDateTime(new DateTime(2021, 1, 4, 14, 0, 0)),
-                    End = new CalDateTime(new DateTime(2021, 1, 4, 17, 0, 0)),
+                    Start = new CalDateTime(new DateTime(2021, 1, 4, 17, 30, 0)),
+                    End = new CalDateTime(new DateTime(2021, 1, 4, 20, 00, 0)),
                     RecurrenceRules = new List<RecurrencePattern> { rrule },
                     Offset = offsetOff,
                 };
-                calendar.Events.Add(e_14__17);
-                myCalendarEvents.Add(e_14__17);
+                calendar.Events.Add(e_17_30__20_00);
+                myCalendarEvents.Add(e_17_30__20_00);
                 //on
-                var e_17__18_30 = new MyCalendarEvent
+                var e_20_00__22 = new MyCalendarEvent
                 {
-                    Start = new CalDateTime(new DateTime(2021, 1, 4, 17, 0, 0)),
-                    End = new CalDateTime(new DateTime(2021, 1, 4, 18, 30, 0)),
-                    RecurrenceRules = new List<RecurrencePattern> { rrule },
-                    Offset = offsetOn,
-                };
-                calendar.Events.Add(e_17__18_30);
-                myCalendarEvents.Add(e_17__18_30);
-                //off
-                var e_18_30__20_30 = new MyCalendarEvent
-                {
-                    Start = new CalDateTime(new DateTime(2021, 1, 4, 18, 30, 0)),
-                    End = new CalDateTime(new DateTime(2021, 1, 4, 20, 30, 0)),
-                    RecurrenceRules = new List<RecurrencePattern> { rrule },
-                    Offset = offsetOff,
-                };
-                calendar.Events.Add(e_18_30__20_30);
-                myCalendarEvents.Add(e_18_30__20_30);
-                //on
-                var e_20_30__22 = new MyCalendarEvent
-                {
-                    Start = new CalDateTime(new DateTime(2021, 1, 4, 20, 30, 0)),
+                    Start = new CalDateTime(new DateTime(2021, 1, 4, 20, 00, 0)),
                     End = new CalDateTime(new DateTime(2021, 1, 4, 22, 0, 0)),
                     RecurrenceRules = new List<RecurrencePattern> { rrule },
                     Offset = offsetOn,
                 };
-                calendar.Events.Add(e_20_30__22);
-                myCalendarEvents.Add(e_20_30__22);
+                calendar.Events.Add(e_20_00__22);
+                myCalendarEvents.Add(e_20_00__22);
                 //off
                 var e_22__00 = new MyCalendarEvent
                 {
