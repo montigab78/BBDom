@@ -33,10 +33,10 @@ namespace BBDom.Web
             _logger = logger;
             _serviceProvider = serviceProvider;
 
-            KNXLib.Log._logger.DebugEventEndpoint += Log;
-            KNXLib.Log._logger.InfoEventEndpoint += Log;
-            KNXLib.Log._logger.WarnEventEndpoint += Log;
-            KNXLib.Log._logger.ErrorEventEndpoint += Log;
+            KNXLib.Log.Logger.DebugEventEndpoint += Log;
+            KNXLib.Log.Logger.InfoEventEndpoint += Log;
+            KNXLib.Log.Logger.WarnEventEndpoint += Log;
+            KNXLib.Log.Logger.ErrorEventEndpoint += Log;
 
         }
 

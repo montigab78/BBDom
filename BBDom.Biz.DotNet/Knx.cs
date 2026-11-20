@@ -12,10 +12,10 @@ namespace BBDom.Biz.DotNet
         static KnxConnection _connection { get; set; }
         public void Test()
         {
-            KNXLib.Log._logger.DebugEventEndpoint += Log;
-            KNXLib.Log._logger.InfoEventEndpoint += Log;
-            KNXLib.Log._logger.WarnEventEndpoint += Log;
-            KNXLib.Log._logger.ErrorEventEndpoint += Log;
+            KNXLib.Log.Logger.DebugEventEndpoint += Log;
+            KNXLib.Log.Logger.InfoEventEndpoint += Log;
+            KNXLib.Log.Logger.WarnEventEndpoint += Log;
+            KNXLib.Log.Logger.ErrorEventEndpoint += Log;
             //var connection = new KnxConnectionRouting("192.128.1.100");
             _connection = new KnxConnectionTunneling("192.128.1.100", 3671, "192.128.1.1", 3671);
             _connection.Debug = true;
