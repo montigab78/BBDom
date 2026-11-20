@@ -47,6 +47,13 @@ Confronto tra `KNXLib` in BBDom (`28d9170`) e `src/KNXLib` nel fork, ignorando l
 
 La cronologia di BBDom distingue l'importazione iniziale (`96d0b2c`, 7 gennaio 2021), che contiene già `DataPointBit` con i primi quattro ID, il commit `d669969` (9 gennaio 2021), che aggiunge `1.100`, e `c2a9809` (9 gennaio 2024), che aggiunge a Git `Log/Logger.cs`. Quest'ultima data non prova quando sia avvenuta la rinomina: i riferimenti a `_logger` sono già presenti nei file importati nel 2021.
 
-Il `master` del progetto originale arriva al [commit `6b50cef`](https://github.com/lifeemotions/knx.net/commit/6b50cefa6fe24794efe1a86b089139babcb8c509) del 30 giugno 2018 (`1.1.10`), successivo al fork. Include modifiche non presenti nella copia BBDom: intervallo configurabile fra gli invii ([`1220360`](https://github.com/lifeemotions/knx.net/commit/1220360ee66f7e19d7fea8b5a4989f82e96c79f7)) e un intervento sui thread lasciati attivi ([`fa6536f`](https://github.com/lifeemotions/knx.net/commit/fa6536feacccda6d48b797759f4e156096e41d88)). Quest'ultimo usa ancora `Thread.Abort` e `Thread.ResetAbort`: sostituire la copia locale con `1.1.10` non risolverebbe la compatibilità con .NET 10 e perderebbe le personalizzazioni sopra elencate se non venissero riportate.
+Il `master` del progetto originale arriva al [commit `6b50cef`](https://github.com/lifeemotions/knx.net/commit/6b50cefa6fe24794efe1a86b089139babcb8c509) del 30 giugno 2018 (`1.1.10`), successivo al fork. Include due modifiche assenti nella copia BBDom analizzata: intervallo configurabile fra gli invii ([`1220360`](https://github.com/lifeemotions/knx.net/commit/1220360ee66f7e19d7fea8b5a4989f82e96c79f7)) e un intervento sui thread lasciati attivi ([`fa6536f`](https://github.com/lifeemotions/knx.net/commit/fa6536feacccda6d48b797759f4e156096e41d88)). Quest'ultimo usa ancora `Thread.Abort` e `Thread.ResetAbort` e non risolve la compatibilità con .NET 10.
 
-Analisi statica di file e cronologia: nessuna modifica a `KNXLib` e nessuna prova sul gateway.
+### Importazione di KNXLib 1.1.10 e riapplicazione delle modifiche BBDom
+
+Su richiesta dell'utente, è stato importato `src/KNXLib` da `master` del progetto originale a `6b50cef` (successivo al tag `1.1.10`), insieme alla sua licenza MIT. Lo staging contiene solo la copia upstream; le personalizzazioni sono state riapplicate sopra di essa con un confronto a tre vie basato su `e5d9b9d`, senza includerle nello staging. Non è stato creato alcun commit.
+
+- `git diff --cached -- KNXLib` mostra l'importazione upstream senza le modifiche locali.
+- `git diff -- KNXLib` mostra le personalizzazioni riapplicate, incluso `DataPointBit.cs` tramite intent-to-add. La libreria nel working tree resta su .NET Framework 4.7.2, con versione assembly `1.1.10`.
+
+Non è stato avviato il gateway. La compatibilità di arresto e riconnessione su .NET 10 resta un intervento separato.

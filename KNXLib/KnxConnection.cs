@@ -189,6 +189,14 @@ namespace KNXLib
 
             Logger.Debug(ClassName, "Device {0} has status {1}", address, state);
         }
+
+        /// <summary>
+        ///     Set the lock interval between requests sent to the network (in ms)
+        /// </summary>
+        /// <param name="interval">time in ms for the interval</param>
+        public void SetLockIntervalMs(int interval)
+        {
+            _lockManager.IntervalMs = interval;
         }
 
         /// <summary>
