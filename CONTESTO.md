@@ -30,3 +30,23 @@ La libreria contiene ancora `Thread.Abort` e `Thread.ResetAbort`, API non suppor
 ### Aggiornamento del logging
 
 `BBDom.Web` usa `NLog.Web.AspNetCore` 6.3.0 con NLog 6.2.2. La configurazione è nella sezione `NLog` di `appsettings.json` anche per il logger di avvio. Rimangono i target console e file, il livello `Trace`, la rotazione giornaliera e il limite di 10 archivi. `KNXLib` rimane invariata.
+
+### Provenienza e differenze di KNXLib
+
+La libreria è stata copiata nella soluzione, non inclusa come submodule. Il repository indicato, [montigab78/knx.net](https://github.com/montigab78/knx.net), è un fork di [lifeemotions/knx.net](https://github.com/lifeemotions/knx.net). Alla verifica del 20 novembre 2026, `master` del fork era fermo al [commit `e5d9b9d`](https://github.com/montigab78/knx.net/commit/e5d9b9db6db987f7fb066e0211251a122a529bfb) del 16 maggio 2017, relativo al DPT `5.001`. È il riferimento usato per il confronto, non un commit di importazione dichiarato nei metadati locali.
+
+Confronto tra `KNXLib` in BBDom (`28d9170`) e `src/KNXLib` nel fork, ignorando le differenze di fine riga CRLF/LF: su 32 file comuni, 17 coincidono e 15 hanno differenze; un file è solo in BBDom e nessun file della cartella del fork manca nella copia locale. Il confronto non include i test, gli esempi o il sito del repository esterno.
+
+| Area | Differenza locale rispetto al fork |
+| --- | --- |
+| DPT a un bit | `DPT/DataPointBit.cs` esiste solo in BBDom. Gestisce `1.001`, `1.002`, `1.008`, `1.009` e `1.100` come valori booleani. |
+| DPT relativo | `DPT/DataPoint8BitSignRelativeValue.cs` aggiunge `20.102` agli ID già gestiti (`6.001`, `6.010`), senza cambiare la conversione. |
+| Invio | `KnxLockManager.PerformLockedOperation` ritorna subito se la connessione non è attiva, senza attendere il semaforo né eseguire l'operazione. È una guardia contro l'attesa quando si è disconnessi, non una garanzia contro tutte le condizioni di concorrenza. |
+| Logging | La classe pubblica `KNXLib.Log.Logger` è rinominata in `KNXLib.Log._logger` e i riferimenti interni sono aggiornati. `BBDom.Web/KnxConnectionManager.cs` e `BBDom.Biz.DotNet/Knx.cs` si iscrivono ai quattro eventi di log tramite questo nome. Nel ricevitore tunneling ci sono anche diagnostiche commentate senza effetto a runtime. |
+| Progetto | `KNXLib.csproj` passa da .NET Framework 4.0 a 4.7.2, da MSBuild `ToolsVersion` 4.0 a 12.0 e include `DataPointBit.cs`; la versione assembly locale resta `1.1.9`. |
+
+La cronologia di BBDom distingue l'importazione iniziale (`96d0b2c`, 7 gennaio 2021), che contiene già `DataPointBit` con i primi quattro ID, il commit `d669969` (9 gennaio 2021), che aggiunge `1.100`, e `c2a9809` (9 gennaio 2024), che aggiunge a Git `Log/Logger.cs`. Quest'ultima data non prova quando sia avvenuta la rinomina: i riferimenti a `_logger` sono già presenti nei file importati nel 2021.
+
+Il `master` del progetto originale arriva al [commit `6b50cef`](https://github.com/lifeemotions/knx.net/commit/6b50cefa6fe24794efe1a86b089139babcb8c509) del 30 giugno 2018 (`1.1.10`), successivo al fork. Include modifiche non presenti nella copia BBDom: intervallo configurabile fra gli invii ([`1220360`](https://github.com/lifeemotions/knx.net/commit/1220360ee66f7e19d7fea8b5a4989f82e96c79f7)) e un intervento sui thread lasciati attivi ([`fa6536f`](https://github.com/lifeemotions/knx.net/commit/fa6536feacccda6d48b797759f4e156096e41d88)). Quest'ultimo usa ancora `Thread.Abort` e `Thread.ResetAbort`: sostituire la copia locale con `1.1.10` non risolverebbe la compatibilità con .NET 10 e perderebbe le personalizzazioni sopra elencate se non venissero riportate.
+
+Analisi statica di file e cronologia: nessuna modifica a `KNXLib` e nessuna prova sul gateway.
