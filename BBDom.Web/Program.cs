@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting.WindowsServices;
+using NLog;
 using NLog.Web;
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using Topshelf;
 
 namespace BBDom.Web
 {
@@ -13,74 +13,50 @@ namespace BBDom.Web
     {
         public static void Main(string[] args)
         {
-            // NLog: setup the logger first to catch all errors
-            var logger = NLogBuilder.ConfigureNLog("nlog.config").GetCurrentClassLogger();
-
-            var isService = !(Debugger.IsAttached || args.Contains("--console"));
-            var pathToContentRoot = Directory.GetCurrentDirectory();
-            var webHostArgs = args.Where(arg => arg != "--console").ToArray();
-
-            if (isService)
-            {
-                var pathToExe = Process.GetCurrentProcess().MainModule.FileName;
-                logger.Info("pathToExe: {0}", pathToExe);
-                pathToContentRoot = Path.GetDirectoryName(pathToExe);
-            }
-            logger.Info("pathToContentRoot: {0}", pathToContentRoot);
+            var logger = LogManager.Setup().LoadConfigurationFromAppSettings(basePath: GetContentRoot(args)).GetCurrentClassLogger();
 
             try
-            
             {
-                logger.Info("init main");
-                
-                HostFactory.Run(host =>
-                {
-                    host.Service<WebServer>(service =>
-                    {
-                        service.ConstructUsing(s => new WebServer());
-                        service.WhenStarted(s => { s.Start(pathToContentRoot, webHostArgs); });
-                        service.WhenStopped(s => { s.Stop(); });
-                    });
-
-                    host.SetDescription("BBDom.Web Service");
-                    host.SetDisplayName("BBDom.Web");
-                    host.SetServiceName("BBDom.Web");
-                });
+                CreateHostBuilder(args).Build().Run();
             }
             catch (Exception ex)
             {
-                //NLog: catch setup errors
                 logger.Error(ex, "Stopped program because of exception");
                 throw;
             }
             finally
             {
-                // Ensure to flush and stop internal timers/threads before application-exit (Avoid segmentation fault on Linux)
-                NLog.LogManager.Shutdown();
+                LogManager.Shutdown();
             }
-        }                    
-    }
+        }
 
-    public class WebServer
-    {
-        private IHost _webHost;
-
-        public void Start(string pathToContentRoot, string[] args)
+        public static IHostBuilder CreateHostBuilder(string[] args)
         {
-            _webHost = Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder(args)
+            var webHostArgs = args.Where(arg => arg != "--console").ToArray();
+            var hostBuilder = Host.CreateDefaultBuilder(webHostArgs)
+                .UseContentRoot(GetContentRoot(args))
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
-                }).UseContentRoot(pathToContentRoot).UseNLog().Build();
+                })
+                .UseNLog();
 
-            _webHost.StartAsync().GetAwaiter().GetResult();
+            if (!args.Contains("--console"))
+            {
+                hostBuilder.UseWindowsService(options => { options.ServiceName = "BBDom.Web"; });
+            }
+
+            return hostBuilder;
         }
 
-        public void Stop()
+        private static string GetContentRoot(string[] args)
         {
-            _webHost.StopAsync().GetAwaiter().GetResult();
-            _webHost?.Dispose();
+            if (!args.Contains("--console") && WindowsServiceHelpers.IsWindowsService())
+            {
+                return AppContext.BaseDirectory;
+            }
+
+            return Directory.GetCurrentDirectory();
         }
     }
-
 }
