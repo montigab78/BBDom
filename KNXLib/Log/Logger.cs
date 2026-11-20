@@ -4,7 +4,7 @@ namespace KNXLib.Log
 {
     /// <summary>
     /// </summary>
-    public class _logger
+    public class Logger
     {
         /// <summary>
         /// </summary>

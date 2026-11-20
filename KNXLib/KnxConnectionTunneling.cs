@@ -65,7 +65,7 @@ namespace KNXLib
         /// </summary>
         public override void Connect()
         {
-            _logger.Info(ClassName, "KNXLib connecting...");
+            Logger.Info(ClassName, "KNXLib connecting...");
 
             try
             {
@@ -80,7 +80,7 @@ namespace KNXLib
                     }
                     catch (Exception e)
                     {
-                        _logger.Error(ClassName, e);
+                        Logger.Error(ClassName, e);
                     }
                 }
 
@@ -113,7 +113,7 @@ namespace KNXLib
             }
             catch (Exception e)
             {
-                _logger.Error(ClassName, e);
+                Logger.Error(ClassName, e);
             }
         }
 
@@ -131,7 +131,7 @@ namespace KNXLib
             }
             catch (Exception e)
             {
-                _logger.Error(ClassName, e);
+                Logger.Error(ClassName, e);
             }
 
             base.Disconnected();
@@ -228,7 +228,7 @@ namespace KNXLib
             }
             catch (Exception e)
             {
-                _logger.Error(ClassName, e);
+                Logger.Error(ClassName, e);
             }
         }
 

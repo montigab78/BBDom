@@ -73,13 +73,13 @@ namespace KNXLib.DPT
                 input = (int) ((decimal) val);
             else
             {
-                _logger.Error("6.xxx", "input value received is not a valid type");
+                Logger.Error("6.xxx", "input value received is not a valid type");
                 return dataPoint;
             }
 
             if (input > 7 || input < -7)
             {
-                _logger.Error("3.xxx", "input value received is not in a valid range");
+                Logger.Error("3.xxx", "input value received is not in a valid range");
                 return dataPoint;
             }
 

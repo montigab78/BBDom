@@ -135,10 +135,10 @@ namespace KNXLib
             }
             catch(Exception e)
             {
-                _logger.Error(ClassName, e);
+                Logger.Error(ClassName, e);
             }
 
-            //_logger.Debug(ClassName, "KNX is connected. Unlocking send - {0} free locks", _lockManager.LockCount);
+            Logger.Debug(ClassName, "KNX is connected. Unlocking send - {0} free locks", _lockManager.LockCount);
         }
 
         /// <summary>
@@ -155,11 +155,11 @@ namespace KNXLib
             }
             catch (Exception e)
             {
-                _logger.Error(ClassName, e);
+                Logger.Error(ClassName, e);
             }
 
-            _logger.Debug(ClassName, "KNX is disconnected");
-            _logger.Debug(ClassName, "Send locked - {0} free locks", _lockManager.LockCount);
+            Logger.Debug(ClassName, "KNX is disconnected");
+            Logger.Debug(ClassName, "Send locked - {0} free locks", _lockManager.LockCount);
         }
 
         internal void Event(string address, string state)
@@ -170,10 +170,10 @@ namespace KNXLib
             }
             catch (Exception e)
             {
-                _logger.Error(ClassName, e);
+                Logger.Error(ClassName, e);
             }
 
-            _logger.Debug(ClassName, "Device {0} sent event 0x{1}", address, string.Join("", state.Select(c => ((int)c).ToString("X2"))));
+            Logger.Debug(ClassName, "Device {0} sent event 0x{1}", address, string.Join("", state.Select(c => ((int)c).ToString("X2"))));
         }
 
         internal void Status(string address, string state)
@@ -184,10 +184,11 @@ namespace KNXLib
             }
             catch (Exception e)
             {
-                _logger.Error(ClassName, e);
+                Logger.Error(ClassName, e);
             }
 
-            _logger.Debug(ClassName, "Device {0} has status {1}", address, state);
+            Logger.Debug(ClassName, "Device {0} has status {1}", address, state);
+        }
         }
 
         /// <summary>
@@ -287,11 +288,11 @@ namespace KNXLib
         /// <param name="data">Byte array value</param>
         public void Action(string address, byte[] data)
         {
-            _logger.Debug(ClassName, "Sending 0x{0} to {1}.", BitConverter.ToString(data), address);
+            Logger.Debug(ClassName, "Sending 0x{0} to {1}.", BitConverter.ToString(data), address);
 
             _lockManager.PerformLockedOperation(() => KnxSender.Action(address, data));
 
-            _logger.Debug(ClassName, "Sent 0x{0} to {1}.", BitConverter.ToString(data), address);
+            Logger.Debug(ClassName, "Sent 0x{0} to {1}.", BitConverter.ToString(data), address);
         }
 
         // TODO: It would be good to make a type for address, to make sure not any random string can be passed in
@@ -301,11 +302,11 @@ namespace KNXLib
         /// <param name="address"></param>
         public void RequestStatus(string address)
         {
-            _logger.Debug(ClassName, "Sending request status to {0}.", address);
+            Logger.Debug(ClassName, "Sending request status to {0}.", address);
 
             _lockManager.PerformLockedOperation(() => KnxSender.RequestStatus(address));
 
-            _logger.Debug(ClassName, "Sent request status to {0}.", address);
+            Logger.Debug(ClassName, "Sent request status to {0}.", address);
         }
 
         /// <summary>

@@ -45,7 +45,7 @@ namespace KNXLib
             }
             catch (SocketException e)
             {
-                _logger.Error(ClassName, e);
+                Logger.Error(ClassName, e);
                 KnxConnectionTunneling.Disconnected();
             }
             catch (ObjectDisposedException)
@@ -62,14 +62,14 @@ namespace KNXLib
         {
             try
             {
-                //if (datagram.Length >= 4)
-                //{
-                //    _logger.Debug(ClassName, "Received datagram - [2]: {0}, [3]: {1}", datagram[2], datagram[3]);
-                //}
-                //else
-                //{
-                //    _logger.Debug(ClassName, "Received datagram, datagram.Length < 4");
-                //}
+                if (datagram.Length >= 4)
+                {
+                    Logger.Debug(ClassName, "Received datagram - [2]: {0}, [3]: {1}", datagram[2], datagram[3]);
+                }
+                else
+                {
+                    Logger.Debug(ClassName, "Received datagram, datagram.Length < 4");
+                }
                 switch (KnxHelper.GetServiceType(datagram))
                 {
                     case KnxHelper.SERVICE_TYPE.CONNECT_RESPONSE:
@@ -94,7 +94,7 @@ namespace KNXLib
             }
             catch (Exception e)
             {
-                _logger.Error(ClassName, e);
+                Logger.Error(ClassName, e);
 
                 // ignore, missing warning information
             }
@@ -172,12 +172,10 @@ namespace KNXLib
 
             var response = datagram[7];
 
-            //_logger.Debug(ClassName, "Received connection state response - response {0}", response);
-
             if (response != 0x21)
                 return;
 
-            _logger.Debug(ClassName, "Received connection state response - No active connection with channel ID {0}", knxDatagram.channel_id);
+            Logger.Debug(ClassName, "Received connection state response - No active connection with channel ID {0}", knxDatagram.channel_id);
 
             KnxConnection.Disconnect();
         }
@@ -197,7 +195,7 @@ namespace KNXLib
 
             if (knxDatagram.channel_id == 0x00 && knxDatagram.status == 0x24)
             {
-                _logger.Info(ClassName, "KNXLib received connect response - No more connections available");                
+                Logger.Info(ClassName, "KNXLib received connect response - No more connections available");                
             }
             else
             {

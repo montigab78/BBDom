@@ -36,7 +36,7 @@ namespace KNXLib
             }
             catch (Exception e)
             {
-                _logger.Error(ClassName, e);
+                Logger.Error(ClassName, e);
             }
         }
 
@@ -60,7 +60,7 @@ namespace KNXLib
             }
             catch (Exception e)
             {
-                _logger.Error(ClassName, e);
+                Logger.Error(ClassName, e);
             }
         }
 
@@ -72,7 +72,7 @@ namespace KNXLib
             }
             catch (Exception e)
             {
-                _logger.Error(ClassName, e);
+                Logger.Error(ClassName, e);
             }
         }
 
