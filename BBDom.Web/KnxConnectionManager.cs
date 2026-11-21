@@ -67,8 +67,8 @@ namespace BBDom.Web
 
                 //Repeat daily
                 var rrule = new RecurrencePattern(FrequencyType.Daily, 1);
-                double offsetOn = 0.5; //SP should become 20.5
-                double offsetOff = -2; //SP should become 18
+                double offsetOn = -3; //SP should become 17
+                double offsetOff = -3; //SP should become 17
                 var calendar = new Ical.Net.Calendar();
                 List<MyCalendarEvent> myCalendarEvents = new List<MyCalendarEvent>();
                 //off
