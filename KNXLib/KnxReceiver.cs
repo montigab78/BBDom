@@ -12,10 +12,11 @@ namespace KNXLib
 
         private Thread _receiverThread;
         private Thread _consumerThread;
+        private int _runningThreads;
+        private volatile bool _isStopping;
 
-        private const ThreadState StateAlive = ThreadState.Running | ThreadState.Background | ThreadState.WaitSleepJoin;
-
-        private BlockingCollection<KnxDatagram> _rxDatagrams;
+        private readonly object _queueLock = new object();
+        private readonly BlockingCollection<KnxDatagram> _rxDatagrams = new BlockingCollection<KnxDatagram>();
 
         protected KnxReceiver(KnxConnection connection)
         {
@@ -24,71 +25,89 @@ namespace KNXLib
 
         protected KnxConnection KnxConnection { get; private set; }
 
+        protected bool IsStopping => _isStopping;
+
         public abstract void ReceiverThreadFlow();
+
+        protected abstract void StopReceiving();
 
         private void ConsumerThreadFlow()
         {
+            foreach (var datagram in _rxDatagrams.GetConsumingEnumerable())
+            {
+                if (IsStopping)
+                {
+                    break;
+                }
+
+                KnxConnection.Event(datagram.destination_address, datagram.data);
+            }
+        }
+
+        private void RunThread(ThreadStart flow)
+        {
+            Logger.Debug(ClassName, "Worker started: {0}", Thread.CurrentThread.Name);
             try
             {
-                while (true)
-                {
-                    KnxDatagram datagram = null;
-
-                    try
-                    {
-                        datagram = _rxDatagrams.Take();
-                    }
-                    catch (Exception e)
-                    {
-                        if (e is ThreadAbortException)
-                            throw;
-                    }
-
-                    if (datagram != null)
-                        KnxConnection.Event(datagram.destination_address, datagram.data);
-                }
+                flow();
             }
-            catch (ThreadAbortException)
+            finally
             {
-                Thread.ResetAbort();
+                Logger.Debug(ClassName, "Worker exiting: {0}", Thread.CurrentThread.Name);
+                if (Interlocked.Decrement(ref _runningThreads) == 0)
+                {
+                    _rxDatagrams.Dispose();
+                    Logger.Debug(ClassName, "All workers exited; receive queue disposed");
+                }
             }
         }
 
         public void Start()
         {
-            _rxDatagrams = new BlockingCollection<KnxDatagram>();
-            _consumerThread = new Thread(ConsumerThreadFlow) { Name = "KnxEventConsumerThread", IsBackground = true };
+            _runningThreads = 2;
+            _consumerThread = new Thread(() => RunThread(ConsumerThreadFlow)) { Name = "KnxEventConsumerThread", IsBackground = true };
+            _receiverThread = new Thread(() => RunThread(ReceiverThreadFlow)) { Name = "KnxReceiverThread", IsBackground = true };
             _consumerThread.Start();
-
-            _receiverThread = new Thread(ReceiverThreadFlow) { Name = "KnxReceiverThread", IsBackground = true };
             _receiverThread.Start();
         }
 
         public void Stop()
         {
-            try
+            lock (_queueLock)
             {
-                if (_receiverThread.ThreadState.Equals(StateAlive))
+                if (!IsStopping)
                 {
-                    _receiverThread.Abort();
+                    _isStopping = true;
+                    Logger.Debug(ClassName, "Stop requested; completing receive queue with {0} pending telegrams", _rxDatagrams.Count);
+                    _rxDatagrams.CompleteAdding();
                 }
             }
-            catch
+
+            StopReceiving();
+            WaitForStop();
+        }
+
+        internal void WaitForStop()
+        {
+            // A KNX callback can stop the connection from either worker thread.
+            if (Thread.CurrentThread == _receiverThread || Thread.CurrentThread == _consumerThread)
             {
-                Thread.ResetAbort();
+                Logger.Debug(ClassName, "Stop initiated by {0}; workers will exit cooperatively without joining", Thread.CurrentThread.Name);
+                return;
             }
-            try
+
+            WaitForThread(_receiverThread);
+            WaitForThread(_consumerThread);
+            Logger.Debug(ClassName, "Worker shutdown wait completed");
+        }
+
+        private static void WaitForThread(Thread thread)
+        {
+            if (thread != null && thread.IsAlive && !thread.Join(5000))
             {
-                if (_consumerThread.ThreadState.Equals(StateAlive))
-                {
-                    _consumerThread.Abort();
-                }
+                Logger.Error(ClassName, "Worker shutdown timed out after 5 seconds: {0}", thread.Name);
+                throw new TimeoutException("KNX thread did not stop within 5 seconds: " + thread.Name);
             }
-            catch
-            {
-                Thread.ResetAbort();
-            }
-            _rxDatagrams.Dispose();
         }
 
         protected void ProcessCEMI(KnxDatagram datagram, byte[] cemi)
@@ -215,10 +234,19 @@ namespace KNXLib
                 switch (type)
                 {
                     case 8:
-                        _rxDatagrams.Add(datagram);
+                        lock (_queueLock)
+                        {
+                            if (!IsStopping)
+                            {
+                                _rxDatagrams.Add(datagram);
+                            }
+                        }
                         break;
                     case 4:
-                        KnxConnection.Status(datagram.destination_address, datagram.data);
+                        if (!IsStopping)
+                        {
+                            KnxConnection.Status(datagram.destination_address, datagram.data);
+                        }
                         break;
                 }
             }

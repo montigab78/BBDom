@@ -2,7 +2,6 @@ using KNXLib.Log;
 using System;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading;
 
 namespace KNXLib
 {
@@ -10,7 +9,7 @@ namespace KNXLib
     {
         private static readonly string ClassName = typeof(KnxReceiverTunneling).ToString();
 
-        private UdpClient _udpClient;
+        private readonly UdpClient _udpClient;
         private IPEndPoint _localEndpoint;
 
         private readonly object _rxSequenceNumberLock = new object();
@@ -28,33 +27,36 @@ namespace KNXLib
             get { return (KnxConnectionTunneling)KnxConnection; }
         }
 
-        public void SetClient(UdpClient client)
+        protected override void StopReceiving()
         {
-            _udpClient = client;
+            Logger.Debug(ClassName, "Closing tunneling UDP socket to unblock reception");
+            _udpClient.Close();
         }
 
         public override void ReceiverThreadFlow()
         {
             try
             {
-                while (true)
+                while (!IsStopping)
                 {
                     var datagram = _udpClient.Receive(ref _localEndpoint);
-                    ProcessDatagram(datagram);
+                    if (!IsStopping)
+                    {
+                        ProcessDatagram(datagram);
+                    }
                 }
             }
             catch (SocketException e)
             {
-                Logger.Error(ClassName, e);
-                KnxConnectionTunneling.Disconnected();
+                if (!IsStopping)
+                {
+                    Logger.Error(ClassName, e);
+                    KnxConnectionTunneling.Disconnected();
+                }
             }
-            catch (ObjectDisposedException)
+            catch (ObjectDisposedException) when (IsStopping)
             {
-                // ignore, probably reconnect happening
-            }
-            catch (ThreadAbortException)
-            {
-                Thread.ResetAbort();
+                Logger.Debug(ClassName, "Pending UDP reception ended because the socket was closed");
             }
         }
 
@@ -64,11 +66,11 @@ namespace KNXLib
             {
                 if (datagram.Length >= 4)
                 {
-                    Logger.Debug(ClassName, "Received datagram - [2]: {0}, [3]: {1}", datagram[2], datagram[3]);
+                    Logger.Debug(ClassName, "Received {0} bytes from {1}; service 0x{2:X2}{3:X2}", datagram.Length, _localEndpoint, datagram[2], datagram[3]);
                 }
                 else
                 {
-                    Logger.Debug(ClassName, "Received datagram, datagram.Length < 4");
+                    Logger.Warn(ClassName, "Received short datagram: {0} bytes from {1}", datagram.Length, _localEndpoint);
                 }
                 switch (KnxHelper.GetServiceType(datagram))
                 {
@@ -92,6 +94,14 @@ namespace KNXLib
                         break;
                 }
             }
+            catch (ObjectDisposedException) when (IsStopping)
+            {
+                // A consumer callback can close the socket before the ACK is sent.
+            }
+            catch (SocketException) when (IsStopping)
+            {
+                // A send already in progress can be interrupted by shutdown.
+            }
             catch (Exception e)
             {
                 Logger.Error(ClassName, e);
@@ -114,7 +124,10 @@ namespace KNXLib
 
             var channelId = datagram[7];
             if (channelId != KnxConnectionTunneling.ChannelId)
+            {
+                Logger.Debug(ClassName, "Ignoring telegram for channel {0}; active channel is {1}", channelId, KnxConnectionTunneling.ChannelId);
                 return;
+            }
 
             var sequenceNumber = datagram[8];
             var process = true;
@@ -134,12 +147,18 @@ namespace KNXLib
 
                 ProcessCEMI(knxDatagram, cemi);
             }
+            else
+            {
+                Logger.Debug(ClassName, "Skipping already processed telegram: channel {0}, sequence {1}", channelId, sequenceNumber);
+            }
 
             ((KnxSenderTunneling)KnxConnectionTunneling.KnxSender).SendTunnelingAck(sequenceNumber);
+            Logger.Debug(ClassName, "Tunneling ACK sent: channel {0}, sequence {1}", channelId, sequenceNumber);
         }
 
         private void ProcessDisconnectRequest(byte[] datagram)
         {
+            Logger.Info(ClassName, "Gateway requested disconnection");
             KnxConnectionTunneling.DisconnectRequest();
         }
 
@@ -171,11 +190,12 @@ namespace KNXLib
             };
 
             var response = datagram[7];
+            Logger.Debug(ClassName, "Connection state response: channel {0}, status 0x{1:X2}", knxDatagram.channel_id, response);
 
             if (response != 0x21)
                 return;
 
-            Logger.Debug(ClassName, "Received connection state response - No active connection with channel ID {0}", knxDatagram.channel_id);
+            Logger.Warn(ClassName, "Gateway reports no active connection with channel {0}; disconnecting", knxDatagram.channel_id);
 
             KnxConnection.Disconnect();
         }
@@ -193,6 +213,7 @@ namespace KNXLib
                 status = datagram[7]
             };
 
+            Logger.Debug(ClassName, "Connection response: channel {0}, status 0x{1:X2}", knxDatagram.channel_id, knxDatagram.status);
             if (knxDatagram.channel_id == 0x00 && knxDatagram.status == 0x24)
             {
                 Logger.Info(ClassName, "KNXLib received connect response - No more connections available");                

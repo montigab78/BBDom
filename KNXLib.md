@@ -19,9 +19,9 @@
 | Conversioni | `DPT/DataPointTranslator.cs` registra i codec per ID tramite reflection. L'originale documenta `3.007`, `3.008`, `5.001`, `5.003`, `5.004`, `5.010`, `6.001`, `6.010` e `9.001`; BBDom aggiunge i tipi indicati sotto. |
 | Logging | La libreria espone eventi statici tramite `KNXLib.Log.Logger`. I consumer li inoltrano ai propri logger; NLog non è una dipendenza di KNXLib. |
 
-## Differenze della copia attuale
+## Differenze della copia prima della correzione dell'arresto
 
-Confronto tra `KNXLib` in BBDom (`65bddbb`) e `src/KNXLib` nel commit originale `6b50cef`, ignorando CRLF/LF e BOM: **27 dei 32 file comuni coincidono**. Le differenze residue sono:
+Confronto del 20 novembre 2026 tra `KNXLib` in BBDom (`65bddbb`) e `src/KNXLib` nel commit originale `6b50cef`, ignorando CRLF/LF e BOM: **27 dei 32 file comuni coincidono**. Le differenze allora presenti erano:
 
 | File | Differenza rispetto all'originale |
 | --- | --- |
@@ -41,9 +41,29 @@ Confronto tra `KNXLib` in BBDom (`65bddbb`) e `src/KNXLib` nel commit originale 
 
 ## Compatibilità e prossime verifiche
 
-Il porting di BBDom a .NET 10 non ha incluso il retargeting di KNXLib. L'upstream ha introdotto l'intervallo di invio configurabile ([`1220360`](https://github.com/lifeemotions/knx.net/commit/1220360ee66f7e19d7fea8b5a4989f82e96c79f7)) e ha rivisto l'arresto dei thread ([`fa6536f`](https://github.com/lifeemotions/knx.net/commit/fa6536feacccda6d48b797759f4e156096e41d88)). Anche `1.1.10` usa ancora `Thread.Abort` e `Thread.ResetAbort`, non supportati da .NET 10. Una build riuscita non garantisce quindi l'arresto o la riconnessione. Il precedente test loopback riguardava una variante poi annullata.
+Il porting di BBDom a .NET 10 non ha incluso il retargeting di KNXLib. L'upstream ha introdotto l'intervallo di invio configurabile ([`1220360`](https://github.com/lifeemotions/knx.net/commit/1220360ee66f7e19d7fea8b5a4989f82e96c79f7)) e ha rivisto l'arresto dei thread ([`fa6536f`](https://github.com/lifeemotions/knx.net/commit/fa6536feacccda6d48b797759f4e156096e41d88)). La versione originale `1.1.10` usa `Thread.Abort` e `Thread.ResetAbort`, non supportati da .NET 10.
 
-Prima di sostituire o portare la libreria: confermare il trasporto effettivamente richiesto dal gateway, preservare la distinzione tra letture, scritture e telegrammi spontanei, verificare arresto e ripetuti cicli di riconnessione, e riprodurre le conversioni locali (in particolare `1.100` e `20.102`). Questa analisi è statica e non ha contattato il gateway.
+### 21 novembre 2026 — Correzione dell'arresto su .NET 10
+
+L'esecuzione sulla macchina target ha confermato `PlatformNotSupportedException` durante lo stop. La copia locale ora usa arresto cooperativo, senza cambiare il target .NET Framework 4.7.2 o l'API pubblica:
+
+- `KnxReceiver.Stop()` segnala l'arresto e completa la coda, sbloccando il consumer. La coda viene rilasciata dopo l'uscita dei due thread. I telegrammi ancora accodati non vengono consegnati durante lo stop, coerentemente con il precedente arresto forzato.
+- I ricevitori chiudono i socket UDP per sbloccare le ricezioni pendenti. Il routing non mantiene più un thread inattivo in `Thread.Sleep`.
+- Lo stop attende i thread con un limite di 5 secondi per thread; un eventuale timeout viene segnalato con un'eccezione. Se lo stop è richiesto da un callback del ricevitore o consumer, non attende i worker per evitare self-join e attese incrociate.
+- Il tunneling invia la richiesta di disconnessione una sola volta per sessione e chiude comunque il ricevitore se l'invio fallisce. Una risposta del gateway durante lo stop non avvia una seconda disconnessione.
+- La riconnessione chiude la vecchia sessione e crea una nuova coda e un nuovo ricevitore. Il timer non invia nuove richieste durante lo stop. Gli errori di rete effettivi restano registrati; gli errori di socket previsti durante la chiusura sono distinti da quelli della normale ricezione.
+
+Verifica sul runtime .NET 10 con un harness temporaneo e socket solo locali, ripetuta cinque volte: 100 cicli tunneling con eventi, risposte di stato, stop a ricezione inattiva, riutilizzo della porta e riconnessione; 50 race fra stop e risposta del gateway; stop richiesto dal ricevitore e dal consumer; stop sotto traffico di 200 telegrammi; chiusura garantita anche con invio di disconnessione fallito; 50 cicli di ricezione/stop routing simulato. Controllati entrambi i thread terminati, stop normale sotto 2 secondi, singola notifica di disconnessione per sessione e assenza di errori nei percorsi normali. Le prove routing usano socket unicast locali, non un impianto multicast reale.
+
+Resta da pubblicare questa versione sulla macchina target e verificare avvio, stop e successivo riavvio con il gateway reale. Le conversioni locali e il protocollo dei telegrammi non sono stati modificati.
+
+### Diagnostica di ricezione e ciclo di vita
+
+I log distinguono tentativo di connessione, sostituzione della vecchia sessione, risposta del gateway con canale e stato, tunnel stabilito, perdita della connessione e disconnessione richiesta. La diagnostica `Debug` riporta dimensione e mittente dei datagrammi, servizio KNXnet/IP, scarti per canale o sequenza, invio degli ACK, completamento della coda, chiusura UDP e uscita dei worker. I timeout di arresto sono registrati come errori. Gli eventi e le risposte di stato mantengono i log già presenti in `KnxConnection`; i dettagli cEMI aggiuntivi dipendono da `connection.Debug`.
+
+Il consumer Web attuale inoltra tutti gli eventi della libreria con `LogInformation`, anche quelli originariamente `Debug`, `Warn` o `Error`: nel file NLog possono quindi apparire come `INFO`. La correzione non cambia questo instradamento. I log di ricezione sono frequenti e contengono endpoint e indirizzi di gruppo: non distribuirli senza verificare i dati presenti.
+
+Per evitare gli avvisi di Visual Studio sui fine riga, i cinque sorgenti KNXLib coinvolti nella correzione sono mantenuti uniformemente in CRLF, preservando la codifica esistente. Le modifiche successive devono mantenere questo formato.
 
 ## Uso commerciale e alternative
 

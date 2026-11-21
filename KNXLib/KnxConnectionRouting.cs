@@ -65,6 +65,14 @@ namespace KNXLib
         /// </summary>
         public override void Connect()
         {
+            KNXLib.Log.Logger.Info(typeof(KnxConnectionRouting).ToString(), "Connecting routing session: {0}", RemoteEndpoint);
+            if (KnxReceiver != null)
+            {
+                KNXLib.Log.Logger.Info(typeof(KnxConnectionRouting).ToString(), "Reconnecting: stopping previous routing session");
+                KnxReceiver.Stop();
+                _udpClients.Clear();
+            }
+
             try
             {
                 IEnumerable<IPAddress> ipv4Addresses =
@@ -99,11 +107,11 @@ namespace KNXLib
         /// </summary>
         public override void Disconnect()
         {
-            KnxReceiver.Stop();
-            foreach (UdpClient client in _udpClients)
+            if (KnxReceiver != null)
             {
-                client.DropMulticastGroup(ConnectionConfiguration.IpAddress);
-                client.Close();
+                KNXLib.Log.Logger.Info(typeof(KnxConnectionRouting).ToString(), "Disconnecting routing session: {0}", RemoteEndpoint);
+                KnxReceiver.Stop();
+                KNXLib.Log.Logger.Info(typeof(KnxConnectionRouting).ToString(), "Routing receive session closed");
             }
         }
     }

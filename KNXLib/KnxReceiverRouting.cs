@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading;
 
 namespace KNXLib
 {
@@ -19,20 +18,32 @@ namespace KNXLib
             _udpClients = udpClients;
         }
 
+        protected override void StopReceiving()
+        {
+            Logger.Debug(ClassName, "Closing {0} routing UDP sockets", _udpClients.Count);
+            foreach (var client in _udpClients)
+            {
+                client.Close();
+            }
+        }
+
         public override void ReceiverThreadFlow()
         {
             try
             {
                 foreach (var client in _udpClients)
-                    client.BeginReceive(OnReceive, new object[] { client });
+                {
+                    if (IsStopping)
+                    {
+                        break;
+                    }
 
-                // just wait to be aborted
-                while (true)
-                    Thread.Sleep(60000);
+                    client.BeginReceive(OnReceive, new object[] { client });
+                }
             }
-            catch (ThreadAbortException)
+            catch (ObjectDisposedException) when (IsStopping)
             {
-                Thread.ResetAbort();
+                // Stop can close the socket while receive is being registered.
             }
             catch (Exception e)
             {
@@ -49,14 +60,24 @@ namespace KNXLib
             try
             {
                 var datagram = session.EndReceive(result, ref endPoint);
-                ProcessDatagram(datagram);
+                if (!IsStopping)
+                {
+                    Logger.Debug(ClassName, "Received routing datagram: {0} bytes from {1}", datagram.Length, endPoint);
+                    ProcessDatagram(datagram);
+                }
 
-                // We make the next call to the begin receive
-                session.BeginReceive(OnReceive, args);
+                if (!IsStopping)
+                {
+                    session.BeginReceive(OnReceive, args);
+                }
             }
-            catch (ObjectDisposedException)
+            catch (ObjectDisposedException) when (IsStopping)
             {
-                // ignore and exit, session was disposed
+                // Closing the socket completes the pending receive.
+            }
+            catch (SocketException) when (IsStopping)
+            {
+                // A pending receive can also complete with a socket error.
             }
             catch (Exception e)
             {

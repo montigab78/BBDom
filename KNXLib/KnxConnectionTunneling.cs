@@ -4,6 +4,8 @@ using System.Timers;
 using KNXLib.Exceptions;
 using KNXLib.Log;
 using System;
+using System.Threading;
+using Timer = System.Timers.Timer;
 
 namespace KNXLib
 {
@@ -21,6 +23,7 @@ namespace KNXLib
         private const int stateRequestTimerInterval = 60000;
         private UdpClient _udpClient;
         private byte _sequenceNumber;
+        private int _disconnecting = 1;
 
         /// <summary>
         ///     Initializes a new KNX tunneling connection with provided values. Make sure the local system allows
@@ -65,25 +68,18 @@ namespace KNXLib
         /// </summary>
         public override void Connect()
         {
-            Logger.Info(ClassName, "KNXLib connecting...");
+            Logger.Info(ClassName, "Connecting tunnel: local {0}, gateway {1}", _localEndpoint, RemoteEndpoint);
+
+            Interlocked.Exchange(ref _disconnecting, 1);
+            TerminateStateRequest();
+            if (KnxReceiver != null)
+            {
+                Logger.Info(ClassName, "Reconnecting: stopping previous receive session");
+                KnxReceiver.Stop();
+            }
 
             try
             {
-                if (_udpClient != null)
-                {
-                    try
-                    {
-                        _udpClient.Close();
-
-                        if (_udpClient.Client != null)
-                            _udpClient.Client.Dispose();
-                    }
-                    catch (Exception e)
-                    {
-                        Logger.Error(ClassName, e);
-                    }
-                }
-
                 _udpClient = new UdpClient(_localEndpoint)
                 {
                     Client = { DontFragment = true, SendBufferSize = 0, ReceiveTimeout = stateRequestTimerInterval * 2 }
@@ -94,22 +90,15 @@ namespace KNXLib
                 throw new ConnectionErrorException(ConnectionConfiguration, ex);
             }
 
-            if (KnxReceiver == null || KnxSender == null)
-            {
-                KnxReceiver = new KnxReceiverTunneling(this, _udpClient, _localEndpoint);
-                KnxSender = new KnxSenderTunneling(this, _udpClient, RemoteEndpoint);
-            }
-            else
-            {
-                ((KnxReceiverTunneling) KnxReceiver).SetClient(_udpClient);
-                ((KnxSenderTunneling) KnxSender).SetClient(_udpClient);
-            }
-
+            KnxReceiver = new KnxReceiverTunneling(this, _udpClient, _localEndpoint);
+            KnxSender = new KnxSenderTunneling(this, _udpClient, RemoteEndpoint);
+            Interlocked.Exchange(ref _disconnecting, 0);
             KnxReceiver.Start();
 
             try
             {
                 ConnectRequest();
+                Logger.Debug(ClassName, "Connection request sent; waiting for gateway response");
             }
             catch (Exception e)
             {
@@ -122,30 +111,51 @@ namespace KNXLib
         /// </summary>
         public override void Disconnect()
         {
+            if (Interlocked.Exchange(ref _disconnecting, 1) != 0)
+            {
+                Logger.Debug(ClassName, "Disconnect already requested or no active session; waiting for workers if necessary");
+                KnxReceiver?.WaitForStop();
+                return;
+            }
+
+            Logger.Info(ClassName, "Disconnecting tunnel: gateway {0}, channel {1}", RemoteEndpoint, ChannelId);
+            TerminateStateRequest();
             try
             {
-                TerminateStateRequest();
                 DisconnectRequest();
-                KnxReceiver.Stop();
-                _udpClient.Close();
+                Logger.Debug(ClassName, "Disconnect request sent; closing receive session");
             }
             catch (Exception e)
             {
                 Logger.Error(ClassName, e);
             }
-
-            base.Disconnected();
+            finally
+            {
+                try
+                {
+                    KnxReceiver.Stop();
+                    Logger.Info(ClassName, "Receive session closed for gateway {0}", RemoteEndpoint);
+                }
+                finally
+                {
+                    base.Disconnected();
+                }
+            }
         }
 
         internal override void Connected()
         {
-            base.Connected();
-
-            InitializeStateRequest();
+            if (Volatile.Read(ref _disconnecting) == 0)
+            {
+                Logger.Info(ClassName, "Tunnel established: gateway {0}, channel {1}", RemoteEndpoint, ChannelId);
+                InitializeStateRequest();
+                base.Connected();
+            }
         }
 
         internal override void Disconnected()
         {
+            Logger.Warn(ClassName, "Tunnel connection lost: gateway {0}, channel {1}", RemoteEndpoint, ChannelId);
             base.Disconnected();
 
             TerminateStateRequest();
@@ -202,6 +212,11 @@ namespace KNXLib
 
         private void StateRequest(object sender, ElapsedEventArgs ev)
         {
+            if (Volatile.Read(ref _disconnecting) != 0)
+            {
+                return;
+            }
+
             // HEADER
             var datagram = new byte[16];
             datagram[00] = 0x06;
@@ -225,6 +240,14 @@ namespace KNXLib
             try
             {
                 KnxSender.SendData(datagram);
+            }
+            catch (ObjectDisposedException) when (Volatile.Read(ref _disconnecting) != 0)
+            {
+                // A timer callback can race with socket shutdown.
+            }
+            catch (SocketException) when (Volatile.Read(ref _disconnecting) != 0)
+            {
+                // A send already in progress can be interrupted by shutdown.
             }
             catch (Exception e)
             {
